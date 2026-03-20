@@ -50,23 +50,28 @@ export function SplitLayout({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeWorkspace = useAtomValue(activeWorkspaceAtom);
-  const [widthRaw, setWidth] = useLocalStorage<number>(
+  const [storedWidth, setWidth] = useLocalStorage<number>(
     `${name}_width::${activeWorkspace?.id ?? "n/a"}`,
   );
-  const [heightRaw, setHeight] = useLocalStorage<number>(
+  const [storedHeight, setHeight] = useLocalStorage<number>(
     `${name}_height::${activeWorkspace?.id ?? "n/a"}`,
   );
-  const width = widthRaw ?? defaultRatio;
-  let height = heightRaw ?? defaultRatio;
 
-  if (!secondSlot) {
-    height = 0;
-    minHeightPx = 0;
-  }
+  const rawWidth = storedWidth ?? defaultRatio;
+  const rawHeight = secondSlot ? (storedHeight ?? defaultRatio) : 0;
+  const effectiveMinHeightPx = secondSlot ? minHeightPx : 0;
 
   const size = useContainerSize(containerRef);
   const verticalBasedOnSize = size.width !== 0 && size.width < STACK_VERTICAL_WIDTH;
   const vertical = layout !== "horizontal" && (layout === "vertical" || verticalBasedOnSize);
+
+  const heightMinRatio =
+    vertical && size.height > 0 ? Math.min(effectiveMinHeightPx / size.height, 0.5) : 0;
+  const widthMinRatio =
+    !vertical && size.width > 0 ? Math.min(minWidthPx / size.width, 0.5) : 0;
+
+  const height = vertical ? clamp(rawHeight, heightMinRatio, 1 - heightMinRatio) : rawHeight;
+  const width = !vertical ? clamp(rawWidth, widthMinRatio, 1 - widthMinRatio) : rawWidth;
 
   const styles = useMemo<CSSProperties>(() => {
     return {
@@ -75,15 +80,15 @@ export function SplitLayout({
         ? `
             ' ${areaL.gridArea}' minmax(0,${1 - height}fr)
             ' ${areaD.gridArea}' 0
-            ' ${areaR.gridArea}' minmax(${minHeightPx}px,${height}fr)
-            / 1fr            
+            ' ${areaR.gridArea}' minmax(${effectiveMinHeightPx}px,${height}fr)
+            / 1fr
           `
         : `
             ' ${areaL.gridArea} ${areaD.gridArea} ${areaR.gridArea}' minmax(0,1fr)
-            / ${1 - width}fr    0                 ${width}fr           
+            / ${1 - width}fr    0                 ${width}fr
           `,
     };
-  }, [style, vertical, height, minHeightPx, width]);
+  }, [style, vertical, height, effectiveMinHeightPx, width]);
 
   const handleReset = useCallback(() => {
     if (vertical) setHeight(defaultRatio);
@@ -94,7 +99,6 @@ export function SplitLayout({
     (e: ResizeHandleEvent) => {
       if (containerRef.current === null) return;
 
-      // const containerRect = containerRef.current.getBoundingClientRect();
       const { paddingLeft, paddingRight, paddingTop, paddingBottom } = getComputedStyle(
         containerRef.current,
       );
@@ -104,22 +108,23 @@ export function SplitLayout({
       const containerHeight =
         $c.clientHeight - Number.parseFloat(paddingTop) - Number.parseFloat(paddingBottom);
 
-      const mouseStartX = e.xStart;
-      const mouseStartY = e.yStart;
-      const startWidth = containerWidth * width;
-      const startHeight = containerHeight * height;
+      if (containerWidth <= 0 || containerHeight <= 0) return;
 
       if (vertical) {
-        const maxHeightPx = containerHeight - minHeightPx;
-        const newHeightPx = clamp(startHeight - (e.y - mouseStartY), minHeightPx, maxHeightPx);
+        const minRatio = Math.min(effectiveMinHeightPx / containerHeight, 0.5);
+        const startHeight = containerHeight * clamp(rawHeight, minRatio, 1 - minRatio);
+        const maxHeightPx = Math.max(effectiveMinHeightPx, containerHeight - effectiveMinHeightPx);
+        const newHeightPx = clamp(startHeight - (e.y - e.yStart), effectiveMinHeightPx, maxHeightPx);
         setHeight(newHeightPx / containerHeight);
       } else {
-        const maxWidthPx = containerWidth - minWidthPx;
-        const newWidthPx = clamp(startWidth - (e.x - mouseStartX), minWidthPx, maxWidthPx);
+        const minRatio = Math.min(minWidthPx / containerWidth, 0.5);
+        const startWidth = containerWidth * clamp(rawWidth, minRatio, 1 - minRatio);
+        const maxWidthPx = Math.max(minWidthPx, containerWidth - minWidthPx);
+        const newWidthPx = clamp(startWidth - (e.x - e.xStart), minWidthPx, maxWidthPx);
         setWidth(newWidthPx / containerWidth);
       }
     },
-    [width, height, vertical, minHeightPx, setHeight, minWidthPx, setWidth],
+    [rawWidth, rawHeight, vertical, effectiveMinHeightPx, setHeight, minWidthPx, setWidth],
   );
 
   return (

@@ -15,6 +15,7 @@ import { Editor } from "../core/Editor/LazyEditor";
 import { FormattedError } from "../core/FormattedError";
 import { Icon } from "../core/Icon";
 import { Separator } from "../core/Separator";
+import { SplitLayout } from "../core/SplitLayout";
 import { tryFormatGraphql } from "../../lib/formatters";
 import { showGraphQLDocExplorerAtom } from "./graphqlAtoms";
 
@@ -206,24 +207,33 @@ function GraphQLEditorInner({ request, onChange, baseRequest, ...extraEditorProp
   );
 
   return (
-    <div className="h-full w-full grid grid-cols-1 grid-rows-[minmax(0,100%)_auto]">
-      <Editor
-        language="graphql"
-        heightMode="auto"
-        graphQLSchema={schema}
-        format={tryFormatGraphql}
-        defaultValue={currentBody.query}
-        onChange={handleChangeQuery}
-        placeholder="..."
-        actions={actions}
-        stateKey={`graphql_body.${request.id}`}
-        {...extraEditorProps}
-      />
-      <div className="grid grid-rows-[auto_minmax(0,1fr)] grid-cols-1 min-h-[5rem]">
-        <Separator dashed className="pb-1">
-          Variables
-        </Separator>
+    <SplitLayout
+      name="graphql_editor"
+      layout="vertical"
+      defaultRatio={0.25}
+      minHeightPx={40}
+      firstSlot={({ style }) => (
+        <div style={style}>
         <Editor
+          language="graphql"
+          heightMode="auto"
+          graphQLSchema={schema}
+          format={tryFormatGraphql}
+          defaultValue={currentBody.query}
+          onChange={handleChangeQuery}
+          placeholder="..."
+          actions={actions}
+          stateKey={`graphql_body.${request.id}`}
+          {...extraEditorProps}
+        />
+        </div>
+      )}
+      secondSlot={({ style }) => (
+        <div style={style} className="grid grid-rows-[auto_minmax(0,1fr)]">
+          <Separator dashed className="pb-1">
+            Variables
+          </Separator>
+                  <Editor
           language="json"
           heightMode="auto"
           defaultValue={currentBody.variables}
@@ -234,8 +244,9 @@ function GraphQLEditorInner({ request, onChange, baseRequest, ...extraEditorProp
           autocompleteVariables
           {...extraEditorProps}
         />
-      </div>
-    </div>
+        </div>
+      )}
+    />
   );
 }
 
