@@ -12,9 +12,11 @@ interface Props {
   onCreate: (id: string) => void;
   hide: () => void;
   workspaceId: string;
+  /** The base environment (group) this sub-environment belongs to */
+  groupId: string;
 }
 
-export function CreateEnvironmentDialog({ workspaceId, hide, onCreate }: Props) {
+export function CreateEnvironmentDialog({ workspaceId, groupId, hide, onCreate }: Props) {
   const [name, setName] = useState<string>("");
   const [color, setColor] = useState<string | null>(null);
   const [sharable, toggleSharable] = useToggle(false);
@@ -31,6 +33,7 @@ export function CreateEnvironmentDialog({ workspaceId, hide, onCreate }: Props) 
           public: sharable,
           workspaceId,
           parentModel: "environment",
+          parentId: groupId,
         });
         hide();
         onCreate(id);

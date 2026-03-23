@@ -13,7 +13,7 @@ import type { GetTemplateFunctionConfigResponse, JsonPrimitive } from "@yaakapp-
 import { useAtomValue } from "jotai";
 import { md5 } from "js-md5";
 import { invokeCmd } from "../lib/tauri";
-import { activeEnvironmentIdAtom } from "./useActiveEnvironment";
+import { activeEnvironmentIdsAtom } from "./useActiveEnvironment";
 import { activeWorkspaceIdAtom } from "./useActiveWorkspace";
 
 export function useTemplateFunctionConfig(
@@ -23,7 +23,7 @@ export function useTemplateFunctionConfig(
 ) {
   const pluginsKey = useAtomValue(pluginsAtom);
   const workspaceId = useAtomValue(activeWorkspaceIdAtom);
-  const environmentId = useAtomValue(activeEnvironmentIdAtom);
+  const environmentIds = useAtomValue(activeEnvironmentIdsAtom);
   const responses = useAtomValue(httpResponsesAtom);
   const environments = useAtomValue(environmentsAtom);
   const environmentsKey = environments.map((e) => e.id + e.updatedAt).join(":");
@@ -44,7 +44,7 @@ export function useTemplateFunctionConfig(
       functionName,
       values,
       workspaceId, // Refresh when the active workspace changes
-      environmentId, // Refresh when the active environment changes
+      environmentIds, // Refresh when the active environment changes
       environmentsKey, // Refresh when environments change
       responseKey, // Refresh when responses change
       pluginsKey, // Refresh when plugins reload
@@ -52,7 +52,7 @@ export function useTemplateFunctionConfig(
     placeholderData: (prev) => prev, // Keep previous data on refetch
     queryFn: async () => {
       if (functionName == null) return null;
-      return getTemplateFunctionConfig(functionName, values, model, environmentId);
+      return getTemplateFunctionConfig(functionName, values, model, environmentIds);
     },
   });
 }
@@ -61,7 +61,7 @@ export async function getTemplateFunctionConfig(
   functionName: string,
   values: Record<string, JsonPrimitive>,
   model: HttpRequest | GrpcRequest | WebsocketRequest | Folder | Workspace,
-  environmentId: string | undefined,
+  environmentIds: string[],
 ) {
   const config = await invokeCmd<GetTemplateFunctionConfigResponse>(
     "cmd_template_function_config",
@@ -69,7 +69,7 @@ export async function getTemplateFunctionConfig(
       functionName,
       values,
       model,
-      environmentId,
+      environmentIds,
     },
   );
   return config.function;

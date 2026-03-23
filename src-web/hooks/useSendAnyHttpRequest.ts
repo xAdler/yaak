@@ -2,7 +2,7 @@ import type { HttpResponse } from "@yaakapp-internal/models";
 import { getModel } from "@yaakapp-internal/models";
 import { invokeCmd } from "../lib/tauri";
 import { getActiveCookieJar } from "./useActiveCookieJar";
-import { getActiveEnvironment } from "./useActiveEnvironment";
+import { getActiveEnvironmentIds } from "./useActiveEnvironment";
 import { createFastMutation, useFastMutation } from "./useFastMutation";
 
 export function useSendAnyHttpRequest() {
@@ -16,7 +16,7 @@ export function useSendAnyHttpRequest() {
 
       return invokeCmd("cmd_send_http_request", {
         request,
-        environmentId: getActiveEnvironment()?.id,
+        environmentIds: getActiveEnvironmentIds(),
         cookieJarId: getActiveCookieJar()?.id,
       });
     },
@@ -33,7 +33,7 @@ export const sendAnyHttpRequest = createFastMutation<HttpResponse | null, string
 
     return invokeCmd("cmd_send_http_request", {
       request,
-      environmentId: getActiveEnvironment()?.id,
+      environmentIds: getActiveEnvironmentIds(),
       cookieJarId: getActiveCookieJar()?.id,
     });
   },

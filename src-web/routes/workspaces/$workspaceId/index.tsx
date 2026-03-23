@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Workspace } from "../../../components/Workspace";
 
 type WorkspaceSearchSchema = {
-  environment_id?: string | null;
+  environment_id?: string | string[] | null;
   cookie_jar_id?: string | null;
 } & (
   | {
@@ -18,8 +18,15 @@ type WorkspaceSearchSchema = {
 export const Route = createFileRoute("/workspaces/$workspaceId/")({
   component: RouteComponent,
   validateSearch: (search: Record<string, unknown>): WorkspaceSearchSchema => {
+    // Normalize environment_id to always be an array for multi-group support
+    const rawEnvId = search.environment_id;
+    const environmentId = Array.isArray(rawEnvId)
+      ? rawEnvId
+      : typeof rawEnvId === "string"
+        ? [rawEnvId]
+        : undefined;
     const base: Pick<WorkspaceSearchSchema, "environment_id" | "cookie_jar_id"> = {
-      environment_id: search.environment_id as string,
+      environment_id: environmentId,
       cookie_jar_id: search.cookie_jar_id as string,
     };
 

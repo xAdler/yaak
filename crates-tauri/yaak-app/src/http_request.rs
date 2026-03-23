@@ -11,7 +11,7 @@ use tokio::sync::watch::Receiver;
 use yaak::send::{SendHttpRequestWithPluginsParams, send_http_request_with_plugins};
 use yaak_crypto::manager::EncryptionManager;
 use yaak_http::manager::HttpConnectionManager;
-use yaak_models::models::{CookieJar, Environment, HttpRequest, HttpResponse, HttpResponseState};
+use yaak_models::models::{CookieJar, HttpRequest, HttpResponse, HttpResponseState};
 use yaak_models::util::UpdateSource;
 use yaak_plugins::events::PluginContext;
 use yaak_plugins::manager::PluginManager;
@@ -66,7 +66,7 @@ pub async fn send_http_request<R: Runtime>(
     window: &WebviewWindow<R>,
     unrendered_request: &HttpRequest,
     og_response: &HttpResponse,
-    environment: Option<Environment>,
+    environment_ids: Vec<String>,
     cookie_jar: Option<CookieJar>,
     cancelled_rx: &mut Receiver<bool>,
 ) -> Result<HttpResponse> {
@@ -74,7 +74,7 @@ pub async fn send_http_request<R: Runtime>(
         window,
         unrendered_request,
         og_response,
-        environment,
+        environment_ids,
         cookie_jar,
         cancelled_rx,
         &window.plugin_context(),
@@ -86,7 +86,7 @@ pub async fn send_http_request_with_context<R: Runtime>(
     window: &WebviewWindow<R>,
     unrendered_request: &HttpRequest,
     og_response: &HttpResponse,
-    environment: Option<Environment>,
+    environment_ids: Vec<String>,
     cookie_jar: Option<CookieJar>,
     cancelled_rx: &Receiver<bool>,
     plugin_context: &PluginContext,
@@ -101,7 +101,7 @@ pub async fn send_http_request_with_context<R: Runtime>(
     let result = send_http_request_inner(
         window,
         unrendered_request,
-        environment,
+        environment_ids,
         cookie_jar,
         cancelled_rx,
         plugin_context,
@@ -131,7 +131,7 @@ pub async fn send_http_request_with_context<R: Runtime>(
 async fn send_http_request_inner<R: Runtime>(
     window: &WebviewWindow<R>,
     unrendered_request: &HttpRequest,
-    environment: Option<Environment>,
+    environment_ids: Vec<String>,
     cookie_jar: Option<CookieJar>,
     cancelled_rx: &Receiver<bool>,
     plugin_context: &PluginContext,
@@ -141,7 +141,6 @@ async fn send_http_request_inner<R: Runtime>(
     let plugin_manager = Arc::new((*app_handle.state::<PluginManager>()).clone());
     let encryption_manager = Arc::new((*app_handle.state::<EncryptionManager>()).clone());
     let connection_manager = app_handle.state::<HttpConnectionManager>();
-    let environment_id = environment.map(|e| e.id);
     let cookie_jar_id = cookie_jar.as_ref().map(|jar| jar.id.clone());
 
     let response_dir = app_handle.path().app_data_dir()?.join("responses");
@@ -149,7 +148,7 @@ async fn send_http_request_inner<R: Runtime>(
         query_manager: app_handle.db_manager().inner(),
         blob_manager: app_handle.blob_manager().inner(),
         request: unrendered_request.clone(),
-        environment_id: environment_id.as_deref(),
+        environment_ids,
         update_source: response_ctx.update_source.clone(),
         cookie_jar_id,
         response_dir: &response_dir,

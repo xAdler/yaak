@@ -4,7 +4,7 @@ use tauri::{Runtime, WebviewWindow};
 pub trait WorkspaceWindowTrait {
     fn workspace_id(&self) -> Option<String>;
     fn cookie_jar_id(&self) -> Option<String>;
-    fn environment_id(&self) -> Option<String>;
+    fn environment_ids(&self) -> Vec<String>;
     fn request_id(&self) -> Option<String>;
 }
 
@@ -24,10 +24,12 @@ impl<R: Runtime> WorkspaceWindowTrait for WebviewWindow<R> {
         query_pairs.find(|(k, _v)| k == "cookie_jar_id").map(|(_k, v)| v.to_string())
     }
 
-    fn environment_id(&self) -> Option<String> {
+    fn environment_ids(&self) -> Vec<String> {
         let url = self.url().unwrap();
-        let mut query_pairs = url.query_pairs();
-        query_pairs.find(|(k, _v)| k == "environment_id").map(|(_k, v)| v.to_string())
+        url.query_pairs()
+            .filter(|(k, _v)| k == "environment_id")
+            .map(|(_k, v)| v.to_string())
+            .collect()
     }
 
     fn request_id(&self) -> Option<String> {

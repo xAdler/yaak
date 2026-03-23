@@ -233,7 +233,7 @@ pub struct SendHttpRequestByIdParams<'a, T: TemplateCallback> {
     pub query_manager: &'a QueryManager,
     pub blob_manager: &'a BlobManager,
     pub request_id: &'a str,
-    pub environment_id: Option<&'a str>,
+    pub environment_ids: Vec<String>,
     pub template_callback: &'a T,
     pub update_source: UpdateSource,
     pub cookie_jar_id: Option<String>,
@@ -249,7 +249,7 @@ pub struct SendHttpRequestParams<'a, T: TemplateCallback> {
     pub query_manager: &'a QueryManager,
     pub blob_manager: &'a BlobManager,
     pub request: HttpRequest,
-    pub environment_id: Option<&'a str>,
+    pub environment_ids: Vec<String>,
     pub template_callback: &'a T,
     pub send_options: Option<SendableHttpRequestOptions>,
     pub update_source: UpdateSource,
@@ -268,7 +268,7 @@ pub struct SendHttpRequestWithPluginsParams<'a> {
     pub query_manager: &'a QueryManager,
     pub blob_manager: &'a BlobManager,
     pub request: HttpRequest,
-    pub environment_id: Option<&'a str>,
+    pub environment_ids: Vec<String>,
     pub update_source: UpdateSource,
     pub cookie_jar_id: Option<String>,
     pub response_dir: &'a Path,
@@ -286,7 +286,7 @@ pub struct SendHttpRequestByIdWithPluginsParams<'a> {
     pub query_manager: &'a QueryManager,
     pub blob_manager: &'a BlobManager,
     pub request_id: &'a str,
-    pub environment_id: Option<&'a str>,
+    pub environment_ids: Vec<String>,
     pub update_source: UpdateSource,
     pub cookie_jar_id: Option<String>,
     pub response_dir: &'a Path,
@@ -352,7 +352,7 @@ pub async fn send_http_request_by_id_with_plugins(
         query_manager: params.query_manager,
         blob_manager: params.blob_manager,
         request,
-        environment_id: params.environment_id,
+        environment_ids: params.environment_ids,
         update_source: params.update_source,
         cookie_jar_id: params.cookie_jar_id,
         response_dir: params.response_dir,
@@ -395,7 +395,7 @@ pub async fn send_http_request_with_plugins(
         query_manager: params.query_manager,
         blob_manager: params.blob_manager,
         request: params.request,
-        environment_id: params.environment_id,
+        environment_ids: params.environment_ids,
         template_callback: &template_callback,
         send_options: None,
         update_source: params.update_source,
@@ -426,7 +426,7 @@ pub async fn send_http_request_by_id<T: TemplateCallback>(
         query_manager: params.query_manager,
         blob_manager: params.blob_manager,
         request,
-        environment_id: params.environment_id,
+        environment_ids: params.environment_ids,
         template_callback: params.template_callback,
         send_options: None,
         update_source: params.update_source,
@@ -447,7 +447,7 @@ pub async fn send_http_request<T: TemplateCallback>(
     params: SendHttpRequestParams<'_, T>,
 ) -> Result<SendHttpRequestResult> {
     let environment_chain =
-        resolve_environment_chain(params.query_manager, &params.request, params.environment_id)?;
+        resolve_environment_chain(params.query_manager, &params.request, &params.environment_ids)?;
     let (resolved_request, auth_context_id) =
         if let Some(auth_context_id) = params.auth_context_id.clone() {
             (params.request.clone(), auth_context_id)
@@ -863,10 +863,10 @@ fn append_error_message(existing_error: Option<String>, message: String) -> Stri
 fn resolve_environment_chain(
     query_manager: &QueryManager,
     request: &HttpRequest,
-    environment_id: Option<&str>,
+    environment_ids: &[String],
 ) -> Result<Vec<Environment>> {
     let db = query_manager.connect();
-    db.resolve_environments(&request.workspace_id, request.folder_id.as_deref(), environment_id)
+    db.resolve_environments(&request.workspace_id, request.folder_id.as_deref(), environment_ids)
         .map_err(SendHttpRequestError::ResolveEnvironments)
 }
 

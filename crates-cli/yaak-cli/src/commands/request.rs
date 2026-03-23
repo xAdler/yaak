@@ -508,7 +508,7 @@ async fn send_http_request_by_id(
         query_manager: ctx.query_manager(),
         blob_manager: ctx.blob_manager(),
         request_id,
-        environment_id: environment,
+        environment_ids: environment.map(|e| vec![e.to_string()]).unwrap_or_default(),
         update_source: UpdateSource::Sync,
         cookie_jar_id,
         response_dir: &response_dir,

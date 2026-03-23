@@ -3,7 +3,7 @@ import type { RenderPurpose } from "@yaakapp-internal/plugins";
 import { useAtomValue } from "jotai";
 import { minPromiseMillis } from "../lib/minPromiseMillis";
 import { invokeCmd } from "../lib/tauri";
-import { useActiveEnvironment } from "./useActiveEnvironment";
+import { activeEnvironmentIdsAtom } from "./useActiveEnvironment";
 import { activeWorkspaceIdAtom } from "./useActiveWorkspace";
 
 export function useRenderTemplate({
@@ -22,15 +22,15 @@ export function useRenderTemplate({
   preservePreviousValue?: boolean;
 }) {
   const workspaceId = useAtomValue(activeWorkspaceIdAtom) ?? "n/a";
-  const environmentId = useActiveEnvironment()?.id ?? null;
+  const environmentIds = useAtomValue(activeEnvironmentIdsAtom);
   return useQuery<string>({
     refetchOnWindowFocus: false,
     enabled,
     placeholderData: preservePreviousValue ? (prev) => prev : undefined,
-    queryKey: ["render_template", workspaceId, environmentId, refreshKey, purpose, ignoreError],
+    queryKey: ["render_template", workspaceId, environmentIds, refreshKey, purpose, ignoreError],
     queryFn: () =>
       minPromiseMillis(
-        renderTemplate({ template, workspaceId, environmentId, purpose, ignoreError }),
+        renderTemplate({ template, workspaceId, environmentIds, purpose, ignoreError }),
         300,
       ),
   });
@@ -39,20 +39,20 @@ export function useRenderTemplate({
 export async function renderTemplate({
   template,
   workspaceId,
-  environmentId,
+  environmentIds,
   purpose,
   ignoreError,
 }: {
   template: string;
   workspaceId: string;
-  environmentId: string | null;
+  environmentIds: string[];
   purpose: RenderPurpose;
   ignoreError?: boolean;
 }): Promise<string> {
   return invokeCmd("cmd_render_template", {
     template,
     workspaceId,
-    environmentId,
+    environmentIds,
     purpose,
     ignoreError,
   });
@@ -61,11 +61,11 @@ export async function renderTemplate({
 export async function decryptTemplate({
   template,
   workspaceId,
-  environmentId,
+  environmentIds,
 }: {
   template: string;
   workspaceId: string;
-  environmentId: string | null;
+  environmentIds: string[];
 }): Promise<string> {
-  return invokeCmd("cmd_decrypt_template", { template, workspaceId, environmentId });
+  return invokeCmd("cmd_decrypt_template", { template, workspaceId, environmentIds });
 }

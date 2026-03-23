@@ -38,7 +38,7 @@ use yaak_templates::strip_json_comments::strip_json_comments;
 use yaak_grpc::{Code, ServiceDefinition, serialize_message};
 use yaak_mac_window::AppHandleMacWindowExt;
 use yaak_models::models::{
-    AnyModel, CookieJar, Environment, GrpcConnection, GrpcConnectionState, GrpcEvent,
+    AnyModel, CookieJar, GrpcConnection, GrpcConnectionState, GrpcEvent,
     GrpcEventType, HttpRequest, HttpResponse, HttpResponseEvent, HttpResponseState, Workspace,
     WorkspaceMeta,
 };
@@ -173,12 +173,12 @@ async fn cmd_render_template<R: Runtime>(
     app_handle: AppHandle<R>,
     template: &str,
     workspace_id: &str,
-    environment_id: Option<&str>,
+    environment_ids: Option<Vec<String>>,
     purpose: Option<RenderPurpose>,
     ignore_error: Option<bool>,
 ) -> YaakResult<String> {
     let environment_chain =
-        app_handle.db().resolve_environments(workspace_id, None, environment_id)?;
+        app_handle.db().resolve_environments(workspace_id, None, &environment_ids.unwrap_or_default())?;
     let plugin_manager = Arc::new((*app_handle.state::<PluginManager>()).clone());
     let encryption_manager = Arc::new((*app_handle.state::<EncryptionManager>()).clone());
     let result = render_template(
@@ -213,7 +213,7 @@ async fn cmd_dismiss_notification<R: Runtime>(
 #[tauri::command]
 async fn cmd_grpc_reflect<R: Runtime>(
     request_id: &str,
-    environment_id: Option<&str>,
+    environment_ids: Option<Vec<String>>,
     proto_files: Vec<String>,
     window: WebviewWindow<R>,
     app_handle: AppHandle<R>,
@@ -225,7 +225,7 @@ async fn cmd_grpc_reflect<R: Runtime>(
     let environment_chain = app_handle.db().resolve_environments(
         &unrendered_request.workspace_id,
         unrendered_request.folder_id.as_deref(),
-        environment_id,
+        &environment_ids.unwrap_or_default(),
     )?;
     let workspace = app_handle.db().get_workspace(&unrendered_request.workspace_id)?;
 
@@ -272,7 +272,7 @@ async fn cmd_grpc_reflect<R: Runtime>(
 #[tauri::command]
 async fn cmd_grpc_go<R: Runtime>(
     request_id: &str,
-    environment_id: Option<&str>,
+    environment_ids: Option<Vec<String>>,
     proto_files: Vec<String>,
     app_handle: AppHandle<R>,
     window: WebviewWindow<R>,
@@ -283,7 +283,7 @@ async fn cmd_grpc_go<R: Runtime>(
     let environment_chain = app_handle.db().resolve_environments(
         &unrendered_request.workspace_id,
         unrendered_request.folder_id.as_deref(),
-        environment_id,
+        &environment_ids.unwrap_or_default(),
     )?;
     let workspace = app_handle.db().get_workspace(&unrendered_request.workspace_id)?;
 
@@ -841,17 +841,14 @@ async fn cmd_restart<R: Runtime>(app_handle: AppHandle<R>) -> YaakResult<()> {
 #[tauri::command]
 async fn cmd_send_ephemeral_request<R: Runtime>(
     mut request: HttpRequest,
-    environment_id: Option<&str>,
+    environment_ids: Option<Vec<String>>,
     cookie_jar_id: Option<&str>,
     window: WebviewWindow,
     app_handle: AppHandle<R>,
 ) -> YaakResult<HttpResponse> {
     let response = HttpResponse::default();
     request.id = "".to_string();
-    let environment = match environment_id {
-        Some(id) => Some(app_handle.db().get_environment(id)?),
-        None => None,
-    };
+    let environment_ids = environment_ids.unwrap_or_default();
     let cookie_jar = match cookie_jar_id {
         Some(id) => Some(app_handle.db().get_cookie_jar(id)?),
         None => None,
@@ -864,7 +861,7 @@ async fn cmd_send_ephemeral_request<R: Runtime>(
         }
     });
 
-    send_http_request(&window, &request, &response, environment, cookie_jar, &mut cancel_rx).await
+    send_http_request(&window, &request, &response, environment_ids, cookie_jar, &mut cancel_rx).await
 }
 
 #[tauri::command]
@@ -1073,7 +1070,7 @@ async fn cmd_template_function_config<R: Runtime>(
     function_name: &str,
     values: HashMap<String, JsonPrimitive>,
     model: AnyModel,
-    _environment_id: Option<&str>,
+    _environment_ids: Option<Vec<String>>,
 ) -> YaakResult<GetTemplateFunctionConfigResponse> {
     Ok(plugin_manager
         .get_template_function_config(&window.plugin_context(), function_name, values, model.id())
@@ -1099,7 +1096,7 @@ async fn cmd_get_http_authentication_config<R: Runtime>(
     auth_name: &str,
     values: HashMap<String, JsonPrimitive>,
     model: AnyModel,
-    environment_id: Option<&str>,
+    environment_ids: Option<Vec<String>>,
 ) -> YaakResult<GetHttpAuthenticationConfigResponse> {
     // Extract workspace_id and folder_id from the model to resolve the environment chain
     let (workspace_id, folder_id) = match &model {
@@ -1115,7 +1112,7 @@ async fn cmd_get_http_authentication_config<R: Runtime>(
     let environment_chain = app_handle.db().resolve_environments(
         &workspace_id,
         folder_id.as_deref(),
-        environment_id,
+        &environment_ids.unwrap_or_default(),
     )?;
     let plugin_manager_arc = Arc::new((*plugin_manager).clone());
     let encryption_manager_arc = Arc::new((*encryption_manager).clone());
@@ -1195,7 +1192,7 @@ async fn cmd_call_http_authentication_action<R: Runtime>(
     action_index: i32,
     values: HashMap<String, JsonPrimitive>,
     model: AnyModel,
-    environment_id: Option<&str>,
+    environment_ids: Option<Vec<String>>,
 ) -> YaakResult<()> {
     // Extract workspace_id and folder_id from the model to resolve the environment chain
     let (workspace_id, folder_id) = match &model {
@@ -1211,7 +1208,7 @@ async fn cmd_call_http_authentication_action<R: Runtime>(
     let environment_chain = app_handle.db().resolve_environments(
         &workspace_id,
         folder_id.as_deref(),
-        environment_id,
+        &environment_ids.unwrap_or_default(),
     )?;
     let plugin_manager_arc = Arc::new((*plugin_manager).clone());
     let encryption_manager_arc = Arc::new((*encryption_manager).clone());
@@ -1309,7 +1306,7 @@ async fn cmd_save_response<R: Runtime>(
 async fn cmd_send_http_request<R: Runtime>(
     app_handle: AppHandle<R>,
     window: WebviewWindow<R>,
-    environment_id: Option<&str>,
+    environment_ids: Option<Vec<String>>,
     cookie_jar_id: Option<&str>,
     // NOTE: We receive the entire request because to account for the race
     //   condition where the user may have just edited a field before sending
@@ -1334,16 +1331,7 @@ async fn cmd_send_http_request<R: Runtime>(
         }
     });
 
-    let environment = match environment_id {
-        Some(id) => match app_handle.db().get_environment(id) {
-            Ok(env) => Some(env),
-            Err(e) => {
-                warn!("Failed to find environment by id {id} {}", e);
-                None
-            }
-        },
-        None => None,
-    };
+    let environment_ids = environment_ids.unwrap_or_default();
 
     let cookie_jar = match cookie_jar_id {
         Some(id) => Some(app_handle.db().get_cookie_jar(id)?),
@@ -1354,7 +1342,7 @@ async fn cmd_send_http_request<R: Runtime>(
         &window,
         &request,
         &response,
-        environment,
+        environment_ids,
         cookie_jar,
         &mut cancel_rx,
     )
@@ -1932,8 +1920,8 @@ fn workspace_from_window<R: Runtime>(window: &WebviewWindow<R>) -> Option<Worksp
     window.workspace_id().and_then(|id| window.db().get_workspace(&id).ok())
 }
 
-fn environment_from_window<R: Runtime>(window: &WebviewWindow<R>) -> Option<Environment> {
-    window.environment_id().and_then(|id| window.db().get_environment(&id).ok())
+fn environment_ids_from_window<R: Runtime>(window: &WebviewWindow<R>) -> Vec<String> {
+    window.environment_ids()
 }
 
 fn cookie_jar_from_window<R: Runtime>(window: &WebviewWindow<R>) -> Option<CookieJar> {

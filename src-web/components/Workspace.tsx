@@ -9,7 +9,7 @@ import {
   useSubscribeActiveCookieJarId,
 } from "../hooks/useActiveCookieJar";
 import {
-  activeEnvironmentAtom,
+  activeEnvironmentsAtom,
   useSubscribeActiveEnvironmentId,
 } from "../hooks/useActiveEnvironment";
 import { activeFolderAtom } from "../hooks/useActiveFolder";
@@ -62,7 +62,7 @@ export function Workspace() {
   const [width, setWidth, resetWidth] = useSidebarWidth();
   const [sidebarHidden, setSidebarHidden] = useSidebarHidden();
   const [floatingSidebarHidden, setFloatingSidebarHidden] = useFloatingSidebarHidden();
-  const activeEnvironment = useAtomValue(activeEnvironmentAtom);
+  const activeEnvironments = useAtomValue(activeEnvironmentsAtom);
   const floating = useShouldFloatSidebar();
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const startWidth = useRef<number | null>(null);
@@ -110,10 +110,17 @@ export function Workspace() {
   );
 
   const environmentBgStyle = useMemo(() => {
-    if (activeEnvironment?.color == null) return undefined;
-    const background = `linear-gradient(to right, ${activeEnvironment.color} 15%, transparent 40%)`;
-    return { background };
-  }, [activeEnvironment?.color]);
+    const colors = activeEnvironments
+      .map((e) => e.color)
+      .filter((c): c is string => c != null);
+    if (colors.length === 0) return undefined;
+    // Scale total gradient width: 25% for 1, +15% per additional, capped at 75%
+    const totalWidth = Math.min(75, 25 + (colors.length - 1) * 15);
+    const spacing = totalWidth / colors.length;
+    const stops = colors.map((color, i) => `${color} ${i * spacing}%`);
+    stops.push(`transparent ${totalWidth}%`);
+    return { background: `linear-gradient(to right, ${stops.join(", ")})` };
+  }, [activeEnvironments]);
 
   // We're loading still
   if (workspaces.length === 0) {
@@ -182,7 +189,7 @@ export function Workspace() {
         <div className="absolute inset-0 pointer-events-none">
           <div // Add subtle background
             style={environmentBgStyle}
-            className="absolute inset-0 opacity-[0.07]"
+            className="absolute inset-0 opacity-15"
           />
           <div // Add a subtle border bottom
             style={environmentBgStyle}

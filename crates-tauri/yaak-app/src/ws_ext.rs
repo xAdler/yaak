@@ -44,7 +44,7 @@ pub async fn cmd_ws_delete_connections<R: Runtime>(
 #[command]
 pub async fn cmd_ws_send<R: Runtime>(
     connection_id: &str,
-    environment_id: Option<&str>,
+    environment_ids: Option<Vec<String>>,
     app_handle: AppHandle<R>,
     window: WebviewWindow<R>,
     ws_manager: State<'_, Mutex<WebsocketManager>>,
@@ -54,7 +54,7 @@ pub async fn cmd_ws_send<R: Runtime>(
     let environment_chain = app_handle.db().resolve_environments(
         &unrendered_request.workspace_id,
         unrendered_request.folder_id.as_deref(),
-        environment_id,
+        &environment_ids.unwrap_or_default(),
     )?;
     let (resolved_request, _auth_context_id) =
         resolve_websocket_request(&window, &unrendered_request)?;
@@ -121,7 +121,7 @@ pub async fn cmd_ws_close<R: Runtime>(
 #[command]
 pub async fn cmd_ws_connect<R: Runtime>(
     request_id: &str,
-    environment_id: Option<&str>,
+    environment_ids: Option<Vec<String>>,
     cookie_jar_id: Option<&str>,
     app_handle: AppHandle<R>,
     window: WebviewWindow<R>,
@@ -132,7 +132,7 @@ pub async fn cmd_ws_connect<R: Runtime>(
     let environment_chain = app_handle.db().resolve_environments(
         &unrendered_request.workspace_id,
         unrendered_request.folder_id.as_deref(),
-        environment_id,
+        &environment_ids.unwrap_or_default(),
     )?;
     let workspace = app_handle.db().get_workspace(&unrendered_request.workspace_id)?;
     let settings = app_handle.db().get_settings();

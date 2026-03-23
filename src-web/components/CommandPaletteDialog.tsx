@@ -16,7 +16,7 @@ import { createSubEnvironmentAndActivate } from "../commands/createEnvironment";
 import { openSettings } from "../commands/openSettings";
 import { switchWorkspace } from "../commands/switchWorkspace";
 import { useActiveCookieJar } from "../hooks/useActiveCookieJar";
-import { useActiveEnvironment } from "../hooks/useActiveEnvironment";
+import { getActiveEnvironmentIds, useActiveEnvironment } from "../hooks/useActiveEnvironment";
 import { useActiveRequest } from "../hooks/useActiveRequest";
 import { activeWorkspaceIdAtom } from "../hooks/useActiveWorkspace";
 import { useAllRequests } from "../hooks/useAllRequests";
@@ -333,7 +333,15 @@ export function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
       environmentGroup.items.push({
         key: `switch-environment-${e.id}`,
         label: e.name,
-        onSelect: () => setWorkspaceSearchParams({ environment_id: e.id }),
+        onSelect: () => {
+          const currentIds = getActiveEnvironmentIds();
+          // Remove any active env from the same group, then add the new one
+          const sameGroupEnvIds = new Set(
+            subEnvironments.filter((se) => se.parentId === e.parentId).map((se) => se.id),
+          );
+          const otherIds = currentIds.filter((id) => !sameGroupEnvIds.has(id));
+          setWorkspaceSearchParams({ environment_id: [...otherIds, e.id] });
+        },
       });
     }
 

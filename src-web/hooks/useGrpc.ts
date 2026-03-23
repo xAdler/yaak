@@ -4,7 +4,7 @@ import type { GrpcConnection, GrpcRequest } from "@yaakapp-internal/models";
 import { jotaiStore } from "../lib/jotai";
 import { minPromiseMillis } from "../lib/minPromiseMillis";
 import { invokeCmd } from "../lib/tauri";
-import { activeEnvironmentIdAtom, useActiveEnvironment } from "./useActiveEnvironment";
+import { activeEnvironmentIdsAtom, useActiveEnvironments } from "./useActiveEnvironment";
 import { useDebouncedValue } from "./useDebouncedValue";
 
 export interface ReflectResponseService {
@@ -18,12 +18,13 @@ export function useGrpc(
   protoFiles: string[],
 ) {
   const requestId = req?.id ?? "n/a";
-  const environment = useActiveEnvironment();
+  const activeEnvironments = useActiveEnvironments();
+  const environmentIds = activeEnvironments.map((e) => e.id);
 
   const go = useMutation<void, string>({
     mutationKey: ["grpc_go", conn?.id],
     mutationFn: () =>
-      invokeCmd<void>("cmd_grpc_go", { requestId, environmentId: environment?.id, protoFiles }),
+      invokeCmd<void>("cmd_grpc_go", { requestId, environmentIds, protoFiles }),
   });
 
   const send = useMutation({
@@ -52,9 +53,9 @@ export function useGrpc(
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     queryFn: () => {
-      const environmentId = jotaiStore.get(activeEnvironmentIdAtom);
+      const environmentIds = jotaiStore.get(activeEnvironmentIdsAtom);
       return minPromiseMillis<ReflectResponseService[]>(
-        invokeCmd("cmd_grpc_reflect", { requestId, protoFiles, environmentId }),
+        invokeCmd("cmd_grpc_reflect", { requestId, protoFiles, environmentIds }),
         300,
       );
     },

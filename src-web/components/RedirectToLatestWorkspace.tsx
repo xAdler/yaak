@@ -24,13 +24,13 @@ export function RedirectToLatestWorkspace() {
     fireAndForget(
       (async () => {
         const workspaceId = recentWorkspaces[0] ?? workspaces[0]?.id ?? "n/a";
-        const environmentId = (await getRecentEnvironments(workspaceId))[0] ?? null;
+        const recentEnvIds = await getRecentEnvironments(workspaceId);
         const cookieJarId = (await getRecentCookieJars(workspaceId))[0] ?? null;
         const requestId = (await getRecentRequests(workspaceId))[0] ?? null;
         const params = { workspaceId };
         const search = {
           cookie_jar_id: cookieJarId,
-          environment_id: environmentId,
+          environment_id: recentEnvIds.length > 0 ? recentEnvIds : null,
           request_id: requestId,
         };
 

@@ -34,6 +34,7 @@ pub enum Error {
     MissingBaseEnvironment(String),
 
     #[error("Multiple base environments for {0}. Delete duplicates before continuing.")]
+    #[deprecated(note = "Multiple base environments are now allowed as environment groups")]
     MultipleBaseEnvironments(String),
 
     #[error("unknown error")]

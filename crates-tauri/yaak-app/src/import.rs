@@ -28,7 +28,7 @@ pub(crate) async fn import_data<R: Runtime>(
     // Create WorkspaceContext from window
     let ctx = WorkspaceContext {
         workspace_id: window.workspace_id(),
-        environment_id: window.environment_id(),
+        environment_ids: window.environment_ids(),
         cookie_jar_id: window.cookie_jar_id(),
         request_id: None,
     };

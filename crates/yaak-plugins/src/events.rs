@@ -623,7 +623,7 @@ pub struct WindowInfoRequest {
 #[ts(export, export_to = "gen_events.ts")]
 pub struct WindowInfoResponse {
     pub request_id: Option<String>,
-    pub environment_id: Option<String>,
+    pub environment_ids: Vec<String>,
     pub workspace_id: Option<String>,
     pub label: String,
 }
