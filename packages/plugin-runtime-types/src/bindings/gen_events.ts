@@ -580,7 +580,7 @@ export type WebsocketRequestAction = { label: string, icon?: Icon, };
 
 export type WindowInfoRequest = { label: string, };
 
-export type WindowInfoResponse = { requestId: string | null, environmentId: string | null, workspaceId: string | null, label: string, };
+export type WindowInfoResponse = { requestId: string | null, environmentIds: Array<string>, workspaceId: string | null, label: string, };
 
 export type WindowNavigateEvent = { url: string, };
 

@@ -5,8 +5,8 @@ use crate::models_ext::QueryManagerExt;
 use crate::render::{render_grpc_request, render_http_request, render_json_value};
 use crate::window::{CreateWindowConfig, create_window};
 use crate::{
-    call_frontend, cookie_jar_from_window, environment_from_window, get_window_from_plugin_context,
-    workspace_from_window,
+    call_frontend, cookie_jar_from_window, environment_ids_from_window,
+    get_window_from_plugin_context, workspace_from_window,
 };
 use chrono::Utc;
 use cookie::Cookie;
@@ -195,11 +195,11 @@ async fn handle_host_plugin_request<R: Runtime>(
 
             let workspace =
                 workspace_from_window(&window).expect("Failed to get workspace_id from window URL");
-            let environment_id = environment_from_window(&window).map(|e| e.id);
+            let environment_ids = environment_ids_from_window(&window);
             let environment_chain = window.db().resolve_environments(
                 &workspace.id,
                 req.grpc_request.folder_id.as_deref(),
-                environment_id.as_deref(),
+                &environment_ids,
             )?;
             let plugin_manager = Arc::new((*app_handle.state::<PluginManager>()).clone());
             let encryption_manager = Arc::new((*app_handle.state::<EncryptionManager>()).clone());
@@ -221,11 +221,11 @@ async fn handle_host_plugin_request<R: Runtime>(
 
             let workspace =
                 workspace_from_window(&window).expect("Failed to get workspace_id from window URL");
-            let environment_id = environment_from_window(&window).map(|e| e.id);
+            let environment_ids = environment_ids_from_window(&window);
             let environment_chain = window.db().resolve_environments(
                 &workspace.id,
                 req.http_request.folder_id.as_deref(),
-                environment_id.as_deref(),
+                &environment_ids,
             )?;
             let plugin_manager = Arc::new((*app_handle.state::<PluginManager>()).clone());
             let encryption_manager = Arc::new((*app_handle.state::<EncryptionManager>()).clone());
@@ -247,7 +247,7 @@ async fn handle_host_plugin_request<R: Runtime>(
 
             let workspace =
                 workspace_from_window(&window).expect("Failed to get workspace_id from window URL");
-            let environment_id = environment_from_window(&window).map(|e| e.id);
+            let environment_ids = environment_ids_from_window(&window);
             let folder_id = if let Some(id) = window.request_id() {
                 match window.db().get_any_request(&id) {
                     Ok(AnyRequest::HttpRequest(r)) => r.folder_id,
@@ -261,7 +261,7 @@ async fn handle_host_plugin_request<R: Runtime>(
             let environment_chain = window.db().resolve_environments(
                 &workspace.id,
                 folder_id.as_deref(),
-                environment_id.as_deref(),
+                &environment_ids,
             )?;
             let plugin_manager = Arc::new((*app_handle.state::<PluginManager>()).clone());
             let encryption_manager = Arc::new((*app_handle.state::<EncryptionManager>()).clone());
@@ -281,7 +281,7 @@ async fn handle_host_plugin_request<R: Runtime>(
             let workspace =
                 workspace_from_window(&window).expect("Failed to get workspace_id from window URL");
             let cookie_jar = cookie_jar_from_window(&window);
-            let environment = environment_from_window(&window);
+            let environment_ids = environment_ids_from_window(&window);
 
             if http_request.workspace_id.is_empty() {
                 http_request.workspace_id = workspace.id;
@@ -306,7 +306,7 @@ async fn handle_host_plugin_request<R: Runtime>(
                 &window,
                 &http_request,
                 &http_response,
-                environment,
+                environment_ids,
                 cookie_jar,
                 &mut tokio::sync::watch::channel(false).1,
                 plugin_context,
@@ -434,7 +434,7 @@ async fn handle_host_plugin_request<R: Runtime>(
                 .get_webview_window(&req.label)
                 .ok_or(PluginErr(format!("Failed to find window for {}", req.label)))?;
 
-            let environment_id = environment_from_window(&w).map(|m| m.id);
+            let environment_ids = environment_ids_from_window(&w);
             let workspace_id = workspace_from_window(&w).map(|m| m.id);
             let request_id =
                 match app_handle.db().get_any_request(&w.request_id().unwrap_or_default()) {
@@ -448,7 +448,7 @@ async fn handle_host_plugin_request<R: Runtime>(
                 label: w.label().to_string(),
                 request_id,
                 workspace_id,
-                environment_id,
+                environment_ids,
             })))
         }
         HostRequest::OtherRequest(req) => {

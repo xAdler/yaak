@@ -22,7 +22,7 @@ static EMBEDDED_VENDORED_PLUGINS: Dir<'_> =
 pub struct CliExecutionContext {
     pub request_id: Option<String>,
     pub workspace_id: Option<String>,
-    pub environment_id: Option<String>,
+    pub environment_ids: Vec<String>,
     pub cookie_jar_id: Option<String>,
 }
 

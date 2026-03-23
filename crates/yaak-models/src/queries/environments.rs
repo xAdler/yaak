@@ -1,5 +1,5 @@
 use crate::db_context::DbContext;
-use crate::error::Error::{MissingBaseEnvironment, MultipleBaseEnvironments};
+use crate::error::Error::MissingBaseEnvironment;
 use crate::error::Result;
 use crate::models::{Environment, EnvironmentIden, EnvironmentVariable};
 use crate::util::UpdateSource;
@@ -18,24 +18,27 @@ impl<'a> DbContext<'a> {
         Ok(environments.get(0).cloned())
     }
 
-    pub fn get_base_environment(&self, workspace_id: &str) -> Result<Environment> {
+    /// Returns all base environments (groups) for the workspace, sorted by sort_priority.
+    /// Creates one if none exist.
+    pub fn list_base_environments(&self, workspace_id: &str) -> Result<Vec<Environment>> {
         let environments = self.list_environments_ensure_base(workspace_id)?;
-        let base_environments = environments
+        let mut base_environments: Vec<Environment> = environments
             .into_iter()
             .filter(|e| e.parent_model == "workspace")
-            .collect::<Vec<Environment>>();
-
-        if base_environments.len() > 1 {
-            return Err(MultipleBaseEnvironments(workspace_id.to_string()));
+            .collect();
+        base_environments.sort_by(|a, b| {
+            a.sort_priority
+                .partial_cmp(&b.sort_priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        if base_environments.is_empty() {
+            return Err(MissingBaseEnvironment(workspace_id.to_string()));
         }
-
-        Ok(base_environments.first().cloned().ok_or(
-            // Should never happen because one should be created above if it does not exist
-            MissingBaseEnvironment(workspace_id.to_string()),
-        )?)
+        Ok(base_environments)
     }
 
-    /// Lists environments and will create a base environment if one doesn't exist
+    /// Lists environments and will create a base environment if one doesn't exist.
+    /// Also migrates legacy sub-environments with null parent_id to the first base environment.
     pub fn list_environments_ensure_base(&self, workspace_id: &str) -> Result<Vec<Environment>> {
         let mut environments = self.list_environments_dangerous(workspace_id)?;
 
@@ -55,6 +58,21 @@ impl<'a> DbContext<'a> {
             environments.push(e);
         }
 
+        // Migrate legacy sub-environments with null parent_id
+        let first_base_id = environments
+            .iter()
+            .find(|e| e.parent_model == "workspace")
+            .map(|e| e.id.clone());
+        if let Some(base_id) = first_base_id {
+            for env in &mut environments {
+                if env.parent_model == "environment" && env.parent_id.is_none() {
+                    info!("Migrating sub-environment {} to base env {base_id}", env.id);
+                    env.parent_id = Some(base_id.clone());
+                    let _ = self.upsert(env, &UpdateSource::Background);
+                }
+            }
+        }
+
         Ok(environments)
     }
 
@@ -68,9 +86,21 @@ impl<'a> DbContext<'a> {
         environment: &Environment,
         source: &UpdateSource,
     ) -> Result<Environment> {
+        // If deleting a base environment (group), also delete its sub-environments
+        if environment.parent_model == "workspace" {
+            let sub_environments: Vec<Environment> = self
+                .list_environments_dangerous(&environment.workspace_id)?
+                .into_iter()
+                .filter(|e| e.parent_model == "environment" && e.parent_id.as_deref() == Some(&environment.id))
+                .collect();
+            for sub_env in sub_environments {
+                let _ = self.delete(&sub_env, source);
+            }
+        }
+
         let deleted_environment = self.delete(environment, source)?;
 
-        // Recreate the base environment if we happened to delete it
+        // Recreate a base environment if we happened to delete the last one
         self.list_environments_ensure_base(&environment.workspace_id)?;
 
         Ok(deleted_environment)
@@ -152,7 +182,7 @@ impl<'a> DbContext<'a> {
         &self,
         workspace_id: &str,
         folder_id: Option<&str>,
-        active_environment_id: Option<&str>,
+        active_environment_ids: &[String],
     ) -> Result<Vec<Environment>> {
         let mut environments = Vec::new();
 
@@ -168,20 +198,29 @@ impl<'a> DbContext<'a> {
             let ancestors = self.resolve_environments(
                 workspace_id,
                 folder.folder_id.as_deref(),
-                active_environment_id,
+                active_environment_ids,
             )?;
             environments.extend(ancestors);
         } else {
-            // Add active and base environments
-            if let Some(id) = active_environment_id {
-                if let Ok(e) = self.get_environment(&id) {
-                    // Add active sub environment
-                    environments.push(e);
-                };
-            };
+            // Build chain from all base environments (groups), sorted by sort_priority.
+            // make_vars_hashmap() iterates in reverse, so items earlier in the vec
+            // have higher priority. We want later groups (higher sort_priority) to
+            // override earlier ones, so we iterate in ascending sort_priority order.
+            let base_environments = self.list_base_environments(workspace_id)?;
+            for base_env in &base_environments {
+                // Check if any of the active environment IDs is a sub-env of this group
+                let active_sub = active_environment_ids.iter().find_map(|id| {
+                    self.get_environment(id).ok().filter(|e| {
+                        e.parent_model == "environment"
+                            && e.parent_id.as_deref() == Some(&base_env.id)
+                    })
+                });
 
-            // Add the base environment
-            environments.push(self.get_base_environment(workspace_id)?);
+                if let Some(sub_env) = active_sub {
+                    environments.push(sub_env);
+                }
+                environments.push(base_env.clone());
+            }
         }
 
         Ok(environments)

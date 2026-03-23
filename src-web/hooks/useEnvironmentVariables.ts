@@ -3,15 +3,16 @@ import { foldersAtom } from "@yaakapp-internal/models";
 import { useAtomValue } from "jotai";
 import { useMemo } from "react";
 import { jotaiStore } from "../lib/jotai";
-import { isBaseEnvironment, isFolderEnvironment } from "../lib/model_util";
-import { useActiveEnvironment } from "./useActiveEnvironment";
+import { isBaseEnvironment, isFolderEnvironment, isSubEnvironment } from "../lib/model_util";
+import { useActiveEnvironments } from "./useActiveEnvironment";
 import { useActiveRequest } from "./useActiveRequest";
 import { useEnvironmentsBreakdown } from "./useEnvironmentsBreakdown";
 import { useParentFolders } from "./useParentFolders";
 
 export function useEnvironmentVariables(targetEnvironmentId: string | null) {
-  const { baseEnvironment, folderEnvironments, allEnvironments } = useEnvironmentsBreakdown();
-  const activeEnvironment = useActiveEnvironment();
+  const { baseEnvironments, folderEnvironments, allEnvironments, subEnvironmentsByGroup } =
+    useEnvironmentsBreakdown();
+  const activeEnvironments = useActiveEnvironments();
   const targetEnvironment = allEnvironments.find((e) => e.id === targetEnvironmentId) ?? null;
   const activeRequest = useActiveRequest();
   const folders = useAtomValue(foldersAtom);
@@ -24,18 +25,34 @@ export function useEnvironmentVariables(targetEnvironmentId: string | null) {
       wrapVariables(folderEnvironments.find((fe) => fe.parentId === f.id) ?? null),
     );
 
-    // Add active environment variables to everything except sub environments
-    const activeEnvironmentVariables =
+    // Build variable chain from all groups (sorted by sortPriority).
+    // First group variables have lowest priority, last group has highest.
+    const groupVariables: WrappedEnvironmentVariable[] = [];
+    for (const baseEnv of baseEnvironments) {
+      // If editing a sub-env of this group, show its own vars; otherwise show active sub-env
+      const activeSubForGroup = activeEnvironments.find((e) =>
+        isSubEnvironment(e) && e.parentId === baseEnv.id
+      );
+
+      const subEnvVars =
+        targetEnvironment != null && isSubEnvironment(targetEnvironment) && targetEnvironment.parentId === baseEnv.id
+          ? wrapVariables(targetEnvironment)
+          : wrapVariables(activeSubForGroup ?? null);
+
+      groupVariables.push(...subEnvVars, ...wrapVariables(baseEnv));
+    }
+
+    // When editing a folder or base env, use group variables; for sub-envs, already handled above
+    const activeEnvVariables =
       targetEnvironment == null || // Editing request
       isFolderEnvironment(targetEnvironment) || // Editing folder variables
-      isBaseEnvironment(targetEnvironment) // Editing global variables
-        ? wrapVariables(activeEnvironment)
-        : wrapVariables(targetEnvironment); // Add own variables for sub environments
+      isBaseEnvironment(targetEnvironment) // Editing group variables
+        ? groupVariables
+        : groupVariables; // Sub-env case is handled inside the loop
 
     const allVariables = [
       ...folderVariables,
-      ...activeEnvironmentVariables,
-      ...wrapVariables(baseEnvironment),
+      ...activeEnvVariables,
     ];
 
     for (const v of allVariables) {
@@ -46,7 +63,14 @@ export function useEnvironmentVariables(targetEnvironmentId: string | null) {
     }
 
     return Object.values(varMap);
-  }, [activeEnvironment, baseEnvironment, folderEnvironments, parentFolders, targetEnvironment]);
+  }, [
+    activeEnvironments,
+    baseEnvironments,
+    folderEnvironments,
+    parentFolders,
+    targetEnvironment,
+    subEnvironmentsByGroup,
+  ]);
 }
 
 export interface WrappedEnvironmentVariable {

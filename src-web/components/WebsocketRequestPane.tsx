@@ -7,7 +7,7 @@ import { atom, useAtomValue } from "jotai";
 import type { CSSProperties } from "react";
 import { useCallback, useMemo, useRef } from "react";
 import { getActiveCookieJar } from "../hooks/useActiveCookieJar";
-import { getActiveEnvironment } from "../hooks/useActiveEnvironment";
+import { getActiveEnvironmentIds } from "../hooks/useActiveEnvironment";
 import { activeRequestIdAtom } from "../hooks/useActiveRequestId";
 import { allRequestsAtom } from "../hooks/useAllRequests";
 import { useAuthTab } from "../hooks/useAuthTab";
@@ -139,7 +139,7 @@ export function WebsocketRequestPane({ style, fullHeight, className, activeReque
   const handleConnect = useCallback(async () => {
     await connectWebsocket({
       requestId: activeRequest.id,
-      environmentId: getActiveEnvironment()?.id ?? null,
+      environmentIds: getActiveEnvironmentIds(),
       cookieJarId: getActiveCookieJar()?.id ?? null,
     });
   }, [activeRequest.id]);
@@ -148,7 +148,7 @@ export function WebsocketRequestPane({ style, fullHeight, className, activeReque
     if (connection == null) return;
     await sendWebsocket({
       connectionId: connection?.id,
-      environmentId: getActiveEnvironment()?.id ?? null,
+      environmentIds: getActiveEnvironmentIds(),
     });
   }, [connection]);
 

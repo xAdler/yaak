@@ -1,5 +1,7 @@
 import type { Environment } from "@yaakapp-internal/models";
+import { environmentsAtom } from "@yaakapp-internal/models";
 import { CreateEnvironmentDialog } from "../components/CreateEnvironmentDialog";
+import { getActiveEnvironmentIds } from "../hooks/useActiveEnvironment";
 import { activeWorkspaceIdAtom } from "../hooks/useActiveWorkspace";
 import { createFastMutation } from "../hooks/useFastMutation";
 import { showDialog } from "../lib/dialog";
@@ -7,7 +9,7 @@ import { jotaiStore } from "../lib/jotai";
 import { setWorkspaceSearchParams } from "../lib/setWorkspaceSearchParams";
 
 export const createSubEnvironmentAndActivate = createFastMutation<
-  string | null,
+  { id: string; groupId: string } | null,
   unknown,
   Environment | null
 >({
@@ -22,7 +24,7 @@ export const createSubEnvironmentAndActivate = createFastMutation<
       throw new Error("Cannot create environment when no active workspace");
     }
 
-    return new Promise<string | null>((resolve) => {
+    return new Promise<{ id: string; groupId: string } | null>((resolve) => {
       showDialog({
         id: "new-environment",
         title: "New Environment",
@@ -32,20 +34,30 @@ export const createSubEnvironmentAndActivate = createFastMutation<
         render: ({ hide }) => (
           <CreateEnvironmentDialog
             workspaceId={workspaceId}
+            groupId={baseEnvironment.id}
             hide={hide}
             onCreate={(id: string) => {
-              resolve(id);
+              resolve({ id, groupId: baseEnvironment.id });
             }}
           />
         ),
       });
     });
   },
-  onSuccess: async (environmentId) => {
-    if (environmentId == null) {
+  onSuccess: async (result) => {
+    if (result == null) {
       return; // Was not created
     }
 
-    setWorkspaceSearchParams({ environment_id: environmentId });
+    // Replace the active sub-env for this group, keep others
+    const currentIds = getActiveEnvironmentIds();
+    const allEnvs = jotaiStore.get(environmentsAtom);
+    const groupSubEnvIds = new Set(
+      allEnvs
+        .filter((e) => e.parentModel === "environment" && e.parentId === result.groupId)
+        .map((e) => e.id),
+    );
+    const otherIds = currentIds.filter((id) => !groupSubEnvIds.has(id));
+    setWorkspaceSearchParams({ environment_id: [...otherIds, result.id] });
   },
 });

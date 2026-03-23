@@ -165,7 +165,7 @@ fn resolve_send_execution_context(
         return Ok(CliExecutionContext {
             request_id,
             workspace_id: Some(workspace_id),
-            environment_id: environment.map(str::to_string),
+            environment_ids: environment.map(|e| vec![e.to_string()]).unwrap_or_default(),
             cookie_jar_id,
         });
     }
@@ -176,7 +176,7 @@ fn resolve_send_execution_context(
         return Ok(CliExecutionContext {
             request_id: None,
             workspace_id: Some(folder.workspace_id),
-            environment_id: environment.map(str::to_string),
+            environment_ids: environment.map(|e| vec![e.to_string()]).unwrap_or_default(),
             cookie_jar_id,
         });
     }
@@ -186,7 +186,7 @@ fn resolve_send_execution_context(
         return Ok(CliExecutionContext {
             request_id: None,
             workspace_id: Some(workspace.id),
-            environment_id: environment.map(str::to_string),
+            environment_ids: environment.map(|e| vec![e.to_string()]).unwrap_or_default(),
             cookie_jar_id,
         });
     }
@@ -215,7 +215,7 @@ fn resolve_request_execution_context(
     Ok(CliExecutionContext {
         request_id: Some(request_id.to_string()),
         workspace_id: Some(workspace_id),
-        environment_id: environment.map(str::to_string),
+        environment_ids: environment.map(|e| vec![e.to_string()]).unwrap_or_default(),
         cookie_jar_id,
     })
 }

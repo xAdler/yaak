@@ -202,7 +202,7 @@ async fn build_plugin_reply(
                     query_manager: &host_context.query_manager,
                     blob_manager: &host_context.blob_manager,
                     request: http_request,
-                    environment_id: execution_context.environment_id.as_deref(),
+                    environment_ids: execution_context.environment_ids.clone(),
                     update_source: UpdateSource::Plugin,
                     cookie_jar_id,
                     response_dir: &host_context.response_dir,
@@ -251,7 +251,7 @@ async fn build_plugin_reply(
                     match host_context.query_manager.connect().resolve_environments(
                         &grpc_request.workspace_id,
                         grpc_request.folder_id.as_deref(),
-                        execution_context.environment_id.as_deref(),
+                        &execution_context.environment_ids,
                     ) {
                         Ok(chain) => chain,
                         Err(err) => {
@@ -311,7 +311,7 @@ async fn build_plugin_reply(
                     match host_context.query_manager.connect().resolve_environments(
                         &http_request.workspace_id,
                         http_request.folder_id.as_deref(),
-                        execution_context.environment_id.as_deref(),
+                        &execution_context.environment_ids,
                     ) {
                         Ok(chain) => chain,
                         Err(err) => {
@@ -375,7 +375,7 @@ async fn build_plugin_reply(
                     match host_context.query_manager.connect().resolve_environments(
                         &workspace_id,
                         folder_id.as_deref(),
-                        execution_context.environment_id.as_deref(),
+                        &execution_context.environment_ids,
                     ) {
                         Ok(chain) => chain,
                         Err(err) => {
@@ -510,7 +510,7 @@ async fn build_plugin_reply(
                         .workspace_id
                         .clone()
                         .or_else(|| event.context.workspace_id.clone()),
-                    environment_id: execution_context.environment_id.clone(),
+                    environment_ids: execution_context.environment_ids.clone(),
                 }))
             }
             HostRequest::OtherRequest(payload) => {

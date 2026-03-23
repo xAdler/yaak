@@ -1,7 +1,8 @@
 import classNames from "classnames";
 import { useAtom, useAtomValue } from "jotai";
-import { memo } from "react";
+import { Fragment, memo } from "react";
 import { activeWorkspaceAtom, activeWorkspaceMetaAtom } from "../hooks/useActiveWorkspace";
+import { useEnvironmentsBreakdown } from "../hooks/useEnvironmentsBreakdown";
 import { useToggleCommandPalette } from "../hooks/useToggleCommandPalette";
 import { workspaceLayoutAtom } from "../lib/atoms";
 import { setupOrConfigureEncryption } from "../lib/setupOrConfigureEncryption";
@@ -27,6 +28,7 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({ className }: Prop
   const [workspaceLayout, setWorkspaceLayout] = useAtom(workspaceLayoutAtom);
   const workspace = useAtomValue(activeWorkspaceAtom);
   const workspaceMeta = useAtomValue(activeWorkspaceMetaAtom);
+  const { baseEnvironments } = useEnvironmentsBreakdown();
   const showEncryptionSetup =
     workspace != null &&
     workspaceMeta != null &&
@@ -43,10 +45,14 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({ className }: Prop
       <HStack space={0.5} className={classNames("flex-1 pointer-events-none")}>
         <SidebarActions />
         <CookieDropdown />
-        <HStack className="min-w-0">
+        <HStack className="min-w-0 overflow-x-auto">
           <WorkspaceActionsDropdown />
-          <Icon icon="chevron_right" color="secondary" />
-          <EnvironmentActionsDropdown className="w-auto pointer-events-auto" />
+          {baseEnvironments.map((group) => (
+            <Fragment key={group.id}>
+              <Icon icon="chevron_right" color="secondary" />
+              <EnvironmentActionsDropdown group={group} className="w-auto pointer-events-auto" />
+            </Fragment>
+          ))}
         </HStack>
       </HStack>
       <div className="pointer-events-none w-full max-w-[30vw] mx-auto flex justify-center">

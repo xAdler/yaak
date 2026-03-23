@@ -1,5 +1,5 @@
 import type { Environment, Workspace } from "@yaakapp-internal/models";
-import { duplicateModel, patchModel } from "@yaakapp-internal/models";
+import { createWorkspaceModel, duplicateModel, patchModel } from "@yaakapp-internal/models";
 import { atom, useAtomValue } from "jotai";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createSubEnvironmentAndActivate } from "../commands/createEnvironment";
@@ -16,6 +16,7 @@ import { resolvedModelName } from "../lib/resolvedModelName";
 import { showColorPicker } from "../lib/showColorPicker";
 import { Banner } from "./core/Banner";
 import type { ContextMenuProps, DropdownItem } from "./core/Dropdown";
+import { Dropdown } from "./core/Dropdown";
 import { Icon } from "./core/Icon";
 import { IconButton } from "./core/IconButton";
 import { IconTooltip } from "./core/IconTooltip";
@@ -61,17 +62,7 @@ export function EnvironmentEditDialog({ initialEnvironmentId, setRef }: Props) {
         />
       )}
       secondSlot={() => (
-        <div className="grid grid-rows-[auto_minmax(0,1fr)]">
-          {baseEnvironments.length > 1 ? (
-            <div className="p-3">
-              <Banner color="notice">
-                There are multiple base environments for this workspace. Please delete the
-                environments you no longer need.
-              </Banner>
-            </div>
-          ) : (
-            <span />
-          )}
+        <div className="grid grid-rows-[minmax(0,1fr)]">
           {selectedEnvironment == null ? (
             <div className="p-3 mt-10">
               <Banner color="danger">
@@ -172,16 +163,16 @@ function EnvironmentEditDialogSidebar({
   const getContextMenu = useCallback(
     (items: TreeModel[]): ContextMenuProps["items"] => {
       const environment = items[0];
-      const addEnvironmentItem: DropdownItem = {
-        label: "Create Sub Environment",
-        leftSlot: <Icon icon="plus" />,
-        onSelect: async () => {
-          await createSubEnvironment();
-        },
-      };
 
+      // Context menu for workspace root node
       if (environment == null || environment.model !== "environment") {
-        return [addEnvironmentItem];
+        return [
+          {
+            label: "Create Environment Group",
+            leftSlot: <Icon icon="plus" />,
+            onSelect: () => createEnvironmentGroup(),
+          },
+        ];
       }
 
       const singleEnvironment = items.length === 1;
@@ -193,12 +184,10 @@ function EnvironmentEditDialogSidebar({
         {
           label: "Rename",
           leftSlot: <Icon icon="pencil" />,
-          hidden: isBaseEnvironment(environment) || !singleEnvironment,
+          hidden: !singleEnvironment,
           hotKeyAction: "sidebar.selected.rename",
           hotKeyLabelOnly: true,
           onSelect: async () => {
-            // Not sure why this is needed, but without it the
-            // edit input blurs immediately after opening.
             requestAnimationFrame(() => {
               fireAndForget(actions["sidebar.selected.rename"].cb(items));
             });
@@ -207,7 +196,6 @@ function EnvironmentEditDialogSidebar({
         {
           label: "Duplicate",
           leftSlot: <Icon icon="copy" />,
-          hidden: isBaseEnvironment(environment),
           hotKeyAction: "sidebar.selected.duplicate",
           hotKeyLabelOnly: true,
           onSelect: () => actions["sidebar.selected.duplicate"].cb(items),
@@ -238,10 +226,21 @@ function EnvironmentEditDialogSidebar({
         },
       ];
 
-      // Add sub environment to base environment
+      // Add sub environment and group options to base environment context menu
       if (isBaseEnvironment(environment) && singleEnvironment) {
         menuItems.push({ type: "separator" });
-        menuItems.push(addEnvironmentItem);
+        menuItems.push({
+          label: "Create Sub Environment",
+          leftSlot: <Icon icon="plus" />,
+          onSelect: async () => {
+            await createSubEnvironmentForGroup(environment);
+          },
+        });
+        menuItems.push({
+          label: "Create Environment Group",
+          leftSlot: <Icon icon="plus_circle" />,
+          onSelect: () => createEnvironmentGroup(environment),
+        });
       }
 
       return menuItems;
@@ -251,10 +250,12 @@ function EnvironmentEditDialogSidebar({
 
   const handleDragEnd = useCallback(async function handleDragEnd({
     items,
+    parent,
     children,
     insertAt,
   }: {
     items: TreeModel[];
+    parent: TreeModel;
     children: TreeModel[];
     insertAt: number;
   }) {
@@ -266,18 +267,35 @@ function EnvironmentEditDialogSidebar({
     const shouldUpdateAll = afterPriority - beforePriority < 1;
 
     try {
+      // Determine new parentId for sub-environments dropped into a group
+      const newParentId =
+        parent.model === "environment" && isBaseEnvironment(parent) ? parent.id : undefined;
+
       if (shouldUpdateAll) {
         // Add items to children at insertAt
         children.splice(insertAt, 0, ...items);
-        await Promise.all(children.map((m, i) => patchModel(m, { sortPriority: i * 1000 })));
+        await Promise.all(
+          children.map((m, i) => {
+            const patch: Record<string, unknown> = { sortPriority: i * 1000 };
+            // Re-parent dragged items if they moved to a different group
+            if (newParentId != null && items.includes(m) && m.model === "environment" && isSubEnvironment(m)) {
+              patch.parentId = newParentId;
+            }
+            return patchModel(m, patch);
+          }),
+        );
       } else {
         const range = afterPriority - beforePriority;
         const increment = range / (items.length + 2);
         await Promise.all(
           items.map((m, i) => {
             const sortPriority = beforePriority + (i + 1) * increment;
-            // Spread item sortPriority out over before/after range
-            return patchModel(m, { sortPriority });
+            const patch: Record<string, unknown> = { sortPriority };
+            // Re-parent if dropped into a different group
+            if (newParentId != null && m.model === "environment" && isSubEnvironment(m)) {
+              patch.parentId = newParentId;
+            }
+            return patchModel(m, patch);
           }),
         );
       }
@@ -321,8 +339,8 @@ function EnvironmentEditDialogSidebar({
 
 const treeAtom = atom<TreeNode<TreeModel> | null>((get) => {
   const activeWorkspace = get(activeWorkspaceAtom);
-  const { baseEnvironment, baseEnvironments, subEnvironments } = get(environmentsBreakdownAtom);
-  if (activeWorkspace == null || baseEnvironment == null) return null;
+  const { baseEnvironments, subEnvironmentsByGroup } = get(environmentsBreakdownAtom);
+  if (activeWorkspace == null || baseEnvironments.length === 0) return null;
 
   const root: TreeNode<TreeModel> = {
     item: activeWorkspace,
@@ -331,53 +349,61 @@ const treeAtom = atom<TreeNode<TreeModel> | null>((get) => {
     depth: 0,
   };
 
-  for (const item of baseEnvironments) {
-    root.children?.push({
-      item,
+  for (const baseEnv of baseEnvironments) {
+    const groupNode: TreeNode<TreeModel> = {
+      item: baseEnv,
       parent: root,
       depth: 0,
-      draggable: false,
-    });
-  }
-
-  const parent = root.children?.[0];
-  if (baseEnvironments.length <= 1 && parent != null) {
-    parent.children = subEnvironments.map((item) => ({
-      item,
-      parent,
-      depth: 1,
       localDrag: true,
+    };
+
+    // Add sub-environments for this group
+    const groupSubs = subEnvironmentsByGroup.get(baseEnv.id) ?? [];
+    groupNode.children = groupSubs.map((item) => ({
+      item,
+      parent: groupNode,
+      depth: 1,
     }));
+
+    root.children?.push(groupNode);
   }
 
   return root;
 });
 
 function ItemLeftSlotInner({ item }: { item: TreeModel }) {
-  const { baseEnvironments } = useEnvironmentsBreakdown();
-  return baseEnvironments.length > 1 ? (
-    <Icon icon="alert_triangle" color="notice" />
-  ) : (
+  return (
     item.model === "environment" && item.color && <EnvironmentColorIndicator environment={item} />
   );
 }
 
 function ItemRightSlot({ item }: { item: TreeModel }) {
-  const { baseEnvironments } = useEnvironmentsBreakdown();
+  if (item.model !== "environment" || !isBaseEnvironment(item)) return null;
+
+  const dropdownItems: DropdownItem[] = [
+    {
+      label: "Add Environment",
+      leftSlot: <Icon icon="plus" />,
+      onSelect: async () => { await createSubEnvironmentForGroup(item); },
+    },
+    {
+      label: "Add Environment Group",
+      leftSlot: <Icon icon="plus_circle" />,
+      onSelect: () => createEnvironmentGroup(item),
+    },
+  ];
+
   return (
-    <>
-      {item.model === "environment" && baseEnvironments.length <= 1 && isBaseEnvironment(item) && (
-        <IconButton
-          size="sm"
-          color="custom"
-          iconSize="sm"
-          icon="plus_circle"
-          className="opacity-50 hover:opacity-100"
-          title="Add Sub-Environment"
-          onClick={createSubEnvironment}
-        />
-      )}
-    </>
+    <Dropdown items={dropdownItems}>
+      <IconButton
+        size="sm"
+        color="custom"
+        iconSize="sm"
+        icon="plus_circle"
+        className="opacity-50 hover:opacity-100"
+        title="Add Environment or Group"
+      />
+    </Dropdown>
   );
 }
 
@@ -394,10 +420,34 @@ function ItemInner({ item }: { item: TreeModel }) {
   );
 }
 
-async function createSubEnvironment() {
-  const { baseEnvironment } = jotaiStore.get(environmentsBreakdownAtom);
-  if (baseEnvironment == null) return;
-  const id = await createSubEnvironmentAndActivate.mutateAsync(baseEnvironment);
+async function createEnvironmentGroup(afterGroup?: Environment) {
+  const workspaceId = jotaiStore.get(activeWorkspaceIdAtom) ?? "";
+  const { baseEnvironments } = jotaiStore.get(environmentsBreakdownAtom);
+  let sortPriority: number;
+  if (afterGroup != null) {
+    // Place after the specified group
+    const idx = baseEnvironments.findIndex((g) => g.id === afterGroup.id);
+    const afterPriority = afterGroup.sortPriority;
+    const nextPriority = baseEnvironments[idx + 1]?.sortPriority;
+    sortPriority = nextPriority != null ? (afterPriority + nextPriority) / 2 : afterPriority + 1000;
+  } else {
+    // Place at the end
+    const lastPriority = baseEnvironments[baseEnvironments.length - 1]?.sortPriority ?? 0;
+    sortPriority = lastPriority + 1000;
+  }
+  await createWorkspaceModel({
+    model: "environment",
+    name: "New Group",
+    variables: [],
+    public: false,
+    workspaceId,
+    parentModel: "workspace",
+    sortPriority,
+  });
+}
+
+async function createSubEnvironmentForGroup(group: Environment) {
+  const id = await createSubEnvironmentAndActivate.mutateAsync(group);
   return id;
 }
 

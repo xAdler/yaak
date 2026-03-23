@@ -637,7 +637,7 @@ export class PluginInstance {
           return (await _windowInfo()).workspaceId;
         },
         async environmentId(): Promise<string | null> {
-          return (await _windowInfo()).environmentId;
+          return (await _windowInfo()).environmentIds[0] ?? null;
         },
         openUrl: async ({ onNavigate, onClose, ...args }) => {
           args.label = args.label || `${Math.random()}`;

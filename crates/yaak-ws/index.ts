@@ -9,16 +9,16 @@ export function deleteWebsocketConnections(requestId: string) {
 
 export function connectWebsocket({
   requestId,
-  environmentId,
+  environmentIds,
   cookieJarId,
 }: {
   requestId: string;
-  environmentId: string | null;
+  environmentIds: string[];
   cookieJarId: string | null;
 }) {
   return invoke("cmd_ws_connect", {
     requestId,
-    environmentId,
+    environmentIds,
     cookieJarId,
   }) as Promise<WebsocketConnection>;
 }
@@ -31,13 +31,13 @@ export function closeWebsocket({ connectionId }: { connectionId: string }) {
 
 export function sendWebsocket({
   connectionId,
-  environmentId,
+  environmentIds,
 }: {
   connectionId: string;
-  environmentId: string | null;
+  environmentIds: string[];
 }) {
   return invoke("cmd_ws_send", {
     connectionId,
-    environmentId,
+    environmentIds,
   });
 }

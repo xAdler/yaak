@@ -12,7 +12,7 @@ import { useAtomValue } from "jotai";
 import { md5 } from "js-md5";
 import { useState } from "react";
 import { invokeCmd } from "../lib/tauri";
-import { activeEnvironmentIdAtom } from "./useActiveEnvironment";
+import { activeEnvironmentIdsAtom } from "./useActiveEnvironment";
 import { activeWorkspaceIdAtom } from "./useActiveWorkspace";
 
 export function useHttpAuthenticationConfig(
@@ -21,7 +21,7 @@ export function useHttpAuthenticationConfig(
   model: HttpRequest | GrpcRequest | WebsocketRequest | Folder | Workspace,
 ) {
   const workspaceId = useAtomValue(activeWorkspaceIdAtom);
-  const environmentId = useAtomValue(activeEnvironmentIdAtom);
+  const environmentIds = useAtomValue(activeEnvironmentIdsAtom);
   const responses = useAtomValue(httpResponsesAtom);
   const [forceRefreshCounter, setForceRefreshCounter] = useState<number>(0);
 
@@ -43,7 +43,7 @@ export function useHttpAuthenticationConfig(
       responseKey,
       forceRefreshCounter,
       workspaceId,
-      environmentId,
+      environmentIds,
     ],
     placeholderData: (prev) => prev, // Keep previous data on refetch
     queryFn: async () => {
@@ -54,7 +54,7 @@ export function useHttpAuthenticationConfig(
           authName,
           values,
           model,
-          environmentId,
+          environmentIds,
         },
       );
 
@@ -71,7 +71,7 @@ export function useHttpAuthenticationConfig(
               authName,
               values,
               model,
-              environmentId,
+              environmentIds,
             });
 
             // Ensure the config is refreshed after the action is done

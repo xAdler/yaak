@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { minPromiseMillis } from "../lib/minPromiseMillis";
 import { getResponseBodyText } from "../lib/responseBody";
 import { sendEphemeralRequest } from "../lib/sendEphemeralRequest";
-import { useActiveEnvironment } from "./useActiveEnvironment";
+import { useActiveEnvironments } from "./useActiveEnvironment";
 import { useDebouncedValue } from "./useDebouncedValue";
 
 const introspectionRequestBody = JSON.stringify({
@@ -22,7 +22,7 @@ export function useIntrospectGraphQL(
   // Debounce the request because it can change rapidly, and we don't
   // want to send so too many requests.
   const debouncedRequest = useDebouncedValue(baseRequest);
-  const activeEnvironment = useActiveEnvironment();
+  const activeEnvironments = useActiveEnvironments();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>();
   const [schema, setSchema] = useState<GraphQLSchema | null>(null);
@@ -55,7 +55,7 @@ export function useIntrospectGraphQL(
         body: { text: introspectionRequestBody },
       };
       const response = await minPromiseMillis(
-        sendEphemeralRequest(args, activeEnvironment?.id ?? null),
+        sendEphemeralRequest(args, activeEnvironments.map((e) => e.id)),
         700,
       );
 
@@ -81,7 +81,7 @@ export function useIntrospectGraphQL(
     } finally {
       setIsLoading(false);
     }
-  }, [activeEnvironment?.id, baseRequest, upsertIntrospection]);
+  }, [activeEnvironments, baseRequest, upsertIntrospection]);
 
   // oxlint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -91,7 +91,7 @@ export function useIntrospectGraphQL(
     }
 
     refetch().catch(console.error);
-  }, [baseRequest.id, debouncedRequest.url, debouncedRequest.method, activeEnvironment?.id]);
+  }, [baseRequest.id, debouncedRequest.url, debouncedRequest.method, activeEnvironments]);
 
   const clear = useCallback(async () => {
     setError("");

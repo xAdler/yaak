@@ -1,5 +1,5 @@
 import { parseTemplate } from "@yaakapp-internal/templates";
-import { activeEnvironmentIdAtom } from "../hooks/useActiveEnvironment";
+import { activeEnvironmentIdsAtom } from "../hooks/useActiveEnvironment";
 import { activeWorkspaceIdAtom } from "../hooks/useActiveWorkspace";
 import { jotaiStore } from "./jotai";
 import { invokeCmd } from "./tauri";
@@ -38,8 +38,8 @@ export async function convertTemplateToInsecure(template: string) {
   }
 
   const workspaceId = jotaiStore.get(activeWorkspaceIdAtom) ?? "n/a";
-  const environmentId = jotaiStore.get(activeEnvironmentIdAtom) ?? null;
-  return invokeCmd<string>("cmd_decrypt_template", { template, workspaceId, environmentId });
+  const environmentIds = jotaiStore.get(activeEnvironmentIdsAtom);
+  return invokeCmd<string>("cmd_decrypt_template", { template, workspaceId, environmentIds });
 }
 
 export async function convertTemplateToSecure(template: string): Promise<string> {
@@ -52,6 +52,6 @@ export async function convertTemplateToSecure(template: string): Promise<string>
   }
 
   const workspaceId = jotaiStore.get(activeWorkspaceIdAtom) ?? "n/a";
-  const environmentId = jotaiStore.get(activeEnvironmentIdAtom) ?? null;
-  return invokeCmd<string>("cmd_secure_template", { template, workspaceId, environmentId });
+  const environmentIds = jotaiStore.get(activeEnvironmentIdsAtom);
+  return invokeCmd<string>("cmd_secure_template", { template, workspaceId, environmentIds });
 }

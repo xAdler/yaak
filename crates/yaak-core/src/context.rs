@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Default)]
 pub struct WorkspaceContext {
     pub workspace_id: Option<String>,
-    pub environment_id: Option<String>,
+    pub environment_ids: Vec<String>,
     pub cookie_jar_id: Option<String>,
     pub request_id: Option<String>,
 }
@@ -23,7 +23,7 @@ impl WorkspaceContext {
     }
 
     pub fn with_environment(mut self, environment_id: impl Into<String>) -> Self {
-        self.environment_id = Some(environment_id.into());
+        self.environment_ids.push(environment_id.into());
         self
     }
 

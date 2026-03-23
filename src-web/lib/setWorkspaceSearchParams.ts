@@ -10,7 +10,7 @@ import { router } from "./router.js";
 export function setWorkspaceSearchParams(
   search: Partial<{
     cookie_jar_id: string | null;
-    environment_id: string | null;
+    environment_id: string | string[] | null;
     request_id: string | null;
     folder_id: string | null;
   }>,

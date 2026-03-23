@@ -97,11 +97,13 @@ async function performImport(filePath: string): Promise<boolean> {
   });
 
   if (importedWorkspace != null) {
-    const environmentId = imported.environments[0]?.id ?? null;
+    const environmentIds = imported.environments
+      .filter((e) => e.parentModel === "environment")
+      .map((e) => e.id);
     await router.navigate({
       to: "/workspaces/$workspaceId",
       params: { workspaceId: importedWorkspace.id },
-      search: { environment_id: environmentId },
+      search: { environment_id: environmentIds.length > 0 ? environmentIds : null },
     });
   }
 
