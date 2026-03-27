@@ -5,20 +5,20 @@ import { useEffect } from "react";
 import { appInfo } from "../lib/appInfo";
 import { jotaiStore } from "../lib/jotai";
 import { resolvedModelName } from "../lib/resolvedModelName";
-import { useActiveEnvironment } from "./useActiveEnvironment";
+import { useActiveEnvironments } from "./useActiveEnvironment";
 import { activeRequestAtom } from "./useActiveRequest";
 import { activeWorkspaceAtom } from "./useActiveWorkspace";
 
 export function useSyncWorkspaceRequestTitle() {
   const activeWorkspace = useAtomValue(activeWorkspaceAtom);
-  const activeEnvironment = useActiveEnvironment();
+  const activeEnvironments = useActiveEnvironments();
   const activeRequest = useAtomValue(activeRequestAtom);
 
   useEffect(() => {
     const settings = jotaiStore.get(settingsAtom);
     let newTitle = activeWorkspace ? activeWorkspace.name : "Yaak";
-    if (activeEnvironment) {
-      newTitle += ` (${activeEnvironment.name})`;
+    if (activeEnvironments.length > 0) {
+      newTitle += ` (${activeEnvironments.map((e) => e.name).join(", ")})`;
     }
 
     if (!settings.useNativeTitlebar && activeRequest) {
@@ -30,5 +30,5 @@ export function useSyncWorkspaceRequestTitle() {
     }
 
     setWindowTitle(newTitle);
-  }, [activeEnvironment, activeRequest, activeWorkspace]);
+  }, [activeEnvironments, activeRequest, activeWorkspace]);
 }

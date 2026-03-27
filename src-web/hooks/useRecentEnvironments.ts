@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { jotaiStore } from "../lib/jotai";
 import { getKeyValue, setKeyValue } from "../lib/keyValueStore";
-import { activeEnvironmentAtom } from "./useActiveEnvironment";
+import { activeEnvironmentIdsAtom, activeEnvironmentsAtom } from "./useActiveEnvironment";
 import { useEnvironmentsBreakdown } from "./useEnvironmentsBreakdown";
 import { useKeyValue } from "./useKeyValue";
 
@@ -27,17 +27,23 @@ export function useRecentEnvironments() {
 
 export function useSubscribeRecentEnvironments() {
   useEffect(() => {
-    return jotaiStore.sub(activeEnvironmentAtom, async () => {
-      const activeEnvironment = jotaiStore.get(activeEnvironmentAtom);
-      if (activeEnvironment == null) return;
+    return jotaiStore.sub(activeEnvironmentIdsAtom, async () => {
+      const activeIds = jotaiStore.get(activeEnvironmentIdsAtom);
+      if (activeIds.length === 0) return;
 
-      const key = kvKey(activeEnvironment.workspaceId);
+      const workspaceId = jotaiStore.get(activeEnvironmentsAtom)[0]?.workspaceId;
+      if (workspaceId == null) return;
+
+      const key = kvKey(workspaceId);
       const recentIds = getKeyValue<string[]>({ namespace, key, fallback });
-      if (recentIds[0] === activeEnvironment.id) return; // Short-circuit
 
-      const withoutActiveId = recentIds.filter((id) => id !== activeEnvironment.id);
-      const value = [activeEnvironment.id, ...withoutActiveId];
-      await setKeyValue({ namespace, key, value });
+      // Short-circuit if unchanged
+      if (
+        activeIds.length === recentIds.length &&
+        activeIds.every((id, i) => recentIds[i] === id)
+      ) return;
+
+      await setKeyValue({ namespace, key, value: activeIds });
     });
   }, []);
 }

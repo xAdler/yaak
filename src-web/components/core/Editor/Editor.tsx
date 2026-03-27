@@ -26,7 +26,7 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { activeEnvironmentAtom } from "../../../hooks/useActiveEnvironment";
+import { activeEnvironmentsAtom } from "../../../hooks/useActiveEnvironment";
 import type { WrappedEnvironmentVariable } from "../../../hooks/useEnvironmentVariables";
 import { useEnvironmentVariables } from "../../../hooks/useEnvironmentVariables";
 import { eventMatchesHotkey } from "../../../hooks/useHotKey";
@@ -307,8 +307,9 @@ function EditorInner({
   );
 
   const onClickMissingVariable = useCallback(async (name: string) => {
-    const activeEnvironment = jotaiStore.get(activeEnvironmentAtom);
-    await editEnvironment(activeEnvironment, {
+    const activeEnvs = jotaiStore.get(activeEnvironmentsAtom);
+    const targetEnvironment = activeEnvs.at(-1) ?? null;
+    await editEnvironment(targetEnvironment, {
       addOrFocusVariable: { name, value: "", enabled: true },
     });
   }, []);
